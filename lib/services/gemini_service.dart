@@ -1,9 +1,22 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'dart:developer' as developer;
 
+// 답변 스타일 열거형
+enum ResponseStyle {
+  concise,    // 간결한 답변
+  detailed,   // 상세한 답변
+  bullet,     // 불릿 포인트 형식
+  stepByStep, // 단계별 설명
+  casual,     // 캐주얼한 톤
+  formal,     // 공식적인 톤
+}
+
 class GeminiService {
   static const String _apiKey = 'AIzaSyD_bsFM68w0v-ecfcoCgSgjGzzXwKdbVDI';
   late final GenerativeModel _model;
+  
+  // 현재 답변 스타일 (기본값: 간결)
+  ResponseStyle _currentStyle = ResponseStyle.concise;
 
   GeminiService() {
     developer.log('GeminiService 초기화 중 (유료 Pro 모델)... API 키: ${_apiKey.substring(0, 10)}...', name: 'GeminiService');
@@ -26,6 +39,87 @@ class GeminiService {
     developer.log('GeminiService 초기화 완료', name: 'GeminiService');
   }
 
+  // 답변 스타일 설정
+  void setResponseStyle(ResponseStyle style) {
+    _currentStyle = style;
+    developer.log('답변 스타일 변경: ${style.name}', name: 'GeminiService');
+  }
+
+  // 현재 답변 스타일 반환
+  ResponseStyle getCurrentStyle() => _currentStyle;
+
+  // 스타일별 프롬프트 생성
+  String _getStylePrompt(ResponseStyle style) {
+    switch (style) {
+      case ResponseStyle.concise:
+        return '''
+RESPONSE STYLE: QUICK & HELPFUL
+- Give short, clear answers (50-100 words) that get straight to the point
+- Focus on what international students need to know most
+- Use simple, easy-to-understand English
+- Include essential info but skip unnecessary details
+- End with supportive phrases like "Hope this helps!" or "Need anything else?"
+''';
+
+      case ResponseStyle.detailed:
+        return '''
+RESPONSE STYLE: THOROUGH EXPLANATION
+- Provide comprehensive explanations (200-400 words)
+- Include background context that helps international students understand Korean academic systems
+- Cover different aspects they might be wondering about
+- Add practical examples or real scenarios they might encounter
+- End with encouraging phrases like "Does this make sense?" or "Feel free to ask if anything's unclear!"
+''';
+
+      case ResponseStyle.bullet:
+        return '''
+RESPONSE STYLE: EASY-TO-SCAN FORMAT
+- Format answers using bullet points (•) for quick reading
+- One clear, important point per bullet
+- Keep each point informative but easy to digest
+- Use sub-bullets for additional helpful details
+- Maximum 5-7 main points
+- End with "Any of these points you'd like me to explain more?"
+''';
+
+      case ResponseStyle.stepByStep:
+        return '''
+RESPONSE STYLE: GUIDED WALKTHROUGH
+- Break down processes into clear, numbered steps
+- Start with encouraging phrases like "Here's how to do it..." or "Let me guide you through this..."
+- Each step should be clear and manageable for someone new to Korea
+- Include what to prepare or bring beforehand
+- Add helpful tips or cultural notes when relevant
+- End with "Let me know if you need help with any of these steps!"
+''';
+
+      case ResponseStyle.casual:
+        return '''
+RESPONSE STYLE: FRIENDLY CONVERSATION
+- Talk like a supportive friend helping them settle in
+- Use warm expressions like "Hey there!", "Sure thing!", "No problem at all!"
+- Use natural contractions (don't, won't, can't) but keep it clear
+- Add occasional friendly emojis to make it welcoming
+- Sound approachable and understanding of their situation
+- End with "Hope this helps you feel more settled! What else can I help with?"
+''';
+
+      case ResponseStyle.formal:
+        return '''
+RESPONSE STYLE: CLEAR & PROFESSIONAL
+- Use clear, professional English that's easy for non-native speakers
+- Avoid overly casual language but remain welcoming
+- Structure information in a logical, easy-to-follow way
+- Be respectful and considerate of cultural differences
+- Sound knowledgeable but approachable
+- End with "Please don't hesitate to ask if you need any clarification!"
+''';
+
+      default:
+        return '';
+    }
+  }
+
   // API 연결 테스트 함수
   Future<bool> testConnection() async {
     try {
@@ -44,23 +138,31 @@ class GeminiService {
     try {
       developer.log('Gemini API 호출 시작: $message', name: 'GeminiService');
       
-      // PDF 문서 컨텍스트를 포함한 프롬프트 생성
+      final stylePrompt = _getStylePrompt(_currentStyle);
+      
+      // 외국인 유학생 친화적 프롬프트 생성
       final prompt = '''
-You are a friendly AI assistant that communicates in English.
-Please provide accurate and helpful answers to user questions.
-If questions are about PDF documents, find relevant information and answer them.
+You are a welcoming campus buddy for international students at Hanyang University ERICA Campus. 
+Help foreign students feel comfortable and supported while they navigate their new academic environment.
 
-User question: $message
+$stylePrompt
 
-Please follow these rules for your answer:
-1. Answer in friendly and natural English
-2. Provide accurate information
-3. Guide additional questions if necessary
-4. Keep answers concise within 150 words
+Student question: $message
+
+Guidelines:
+- Be warm and friendly (friendliness level 3/5) - supportive but not overly casual
+- Remember you're talking to international students who might be adjusting to Korea
+- Be encouraging and reassuring - help reduce any anxiety about being in a new country
+- Keep answers clear and helpful
+- If you don't have specific information, be honest and suggest where they might find help
+- End with a supportive follow-up to keep them engaged
+- Use approachable English that's easy to understand
+
+Let's make this international student feel welcome and supported!
 ''';
 
       final content = [Content.text(prompt)];
-      developer.log('API 요청 전송 중...', name: 'GeminiService');
+      developer.log('API 요청 전송 중... (스타일: ${_currentStyle.name})', name: 'GeminiService');
       
       final response = await _model.generateContent(content);
       developer.log('API 응답 받음', name: 'GeminiService');
@@ -91,27 +193,31 @@ Please follow these rules for your answer:
       developer.log('PDF 컨텍스트 길이: ${pdfContext.length}자', name: 'GeminiService');
       developer.log('사용자 질문: $message', name: 'GeminiService');
       
+      final stylePrompt = _getStylePrompt(_currentStyle);
+      
       final prompt = '''
-You are a professional AI assistant for Hanyang University ERICA Campus. Based on the orientation materials and academic guides provided below, please answer student questions accurately and concisely.
+You are a friendly campus buddy chatbot for international students at Hanyang University ERICA Campus. Your mission is to help foreign students feel welcome and comfortable while navigating campus life using official university documents.
 
-=== Reference Documents (Hanyang ERICA Orientation Materials) ===
+=== Official University Documents ===
 $pdfContext
 
-=== User Question ===
+=== Student Question ===
 $message
 
-=== Answer Guidelines ===
-1. Refer to the Hanyang ERICA documents accurately and provide specific answers
-2. Include concrete information like dates, times, locations, and procedures
-3. Focus on course registration, academic schedules, orientation, and exchange programs
-4. Provide helpful answers based on related content even if direct information isn't available
-5. Emphasize important information or precautions students shouldn't miss
-6. Use a friendly yet professional tone
-7. Provide relevant department or contact information when necessary
-8. Only say "Related information cannot be found in the provided materials" when truly irrelevant
-9. Keep answers concise within 200 words
+=== Your Personality & Guidelines ===
+1. **Answer ONLY based on official PDF documents** - Never guess or make up information
+2. **Be warm and welcoming** - Use a friendly tone (friendliness level 3/5) - not too casual, not too formal
+3. **Remember your audience** - These are international students who might be new to Korea and feeling overwhelmed
+4. **Be reassuring and supportive** - Help them feel less anxious about being in a new country
+5. **Explain things clearly** - Some students might not be familiar with Korean academic systems
+6. **Include helpful contact information** - Provide department numbers or official contacts when relevant
+7. **Vary your responses naturally** - Don't end every message the same way
+8. **Check for understanding** - Ask "Does this help?" or "Is there anything unclear?" occasionally
+9. **Keep the conversation flowing** - End with welcoming follow-ups like "What else can I help you with?" or "Any other questions about campus life?"
 
-Answer for Hanyang ERICA students:
+$stylePrompt
+
+Remember: You're here to be a supportive friend helping international students feel at home at ERICA Campus!
 ''';
 
       final content = [Content.text(prompt)];
@@ -127,6 +233,38 @@ Answer for Hanyang ERICA students:
     } catch (e) {
       developer.log('Gemini PDF Analysis Error: $e', name: 'GeminiService');
       return 'Sorry, an error occurred while analyzing the documents.';
+    }
+  }
+  
+  // 커스텀 프롬프트로 응답 생성
+  Future<String> generateCustomResponse(String message, String customPrompt, String pdfContext) async {
+    try {
+      developer.log('커스텀 프롬프트로 응답 생성 시작', name: 'GeminiService');
+      
+      final prompt = '''
+$customPrompt
+
+=== Reference Documents ===
+$pdfContext
+
+=== User Question ===
+$message
+
+Please answer according to the custom instructions above.
+''';
+
+      final content = [Content.text(prompt)];
+      final response = await _model.generateContent(content);
+
+      if (response.text != null && response.text!.isNotEmpty) {
+        developer.log('커스텀 응답 생성 성공', name: 'GeminiService');
+        return response.text!.trim();
+      } else {
+        return 'Sorry, I cannot generate a response with the custom prompt.';
+      }
+    } catch (e) {
+      developer.log('커스텀 응답 생성 오류: $e', name: 'GeminiService');
+      return 'Sorry, an error occurred while generating a custom response.';
     }
   }
 } 

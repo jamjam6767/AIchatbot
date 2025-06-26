@@ -133,14 +133,14 @@ class _ChatScreenState extends State<ChatScreen>
   Future<void> _initializeApp() async {
     // Initial welcome message
     _addMessage(ChatMessage(
-      text: "Hello! I'm a chatbot powered by Google Gemini AI. Initializing system... 🔄",
+      text: "Hey there! 👋 Welcome to Hanyang ERICA! I'm your friendly campus buddy here to help you navigate student life. Just setting things up... 🔄",
       isUser: false,
       timestamp: DateTime.now(),
     ));
     
     // PDF loading
     _addMessage(ChatMessage(
-      text: "📄 Loading PDF documents...",
+      text: "📄 Loading official university documents so I can give you the most accurate information...",
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -153,14 +153,14 @@ class _ChatScreenState extends State<ChatScreen>
       print('DEBUG: PDF 컨텍스트 미리보기: ${_pdfContext.substring(0, _pdfContext.length > 200 ? 200 : _pdfContext.length)}...');
       
       _addMessage(ChatMessage(
-        text: "✅ PDF documents loaded successfully! I'll refer to the documents for answers.\nLoaded context: ${_pdfContext.length} characters",
+        text: "✅ Perfect! I'm all ready to help you with campus life. Feel free to ask me anything about student life, courses, schedules, or anything else about ERICA! 😊",
         isUser: false,
         timestamp: DateTime.now(),
       ));
     } catch (e) {
       print('DEBUG: PDF loading failed: $e');
       _addMessage(ChatMessage(
-        text: "⚠️ PDF document loading failed: ${e.toString()}\nGeneral conversation is available.",
+        text: "⚠️ Having some trouble loading documents right now, but I can still help with general campus questions!",
         isUser: false,
         timestamp: DateTime.now(),
       ));
@@ -168,7 +168,7 @@ class _ChatScreenState extends State<ChatScreen>
     
     // API connection test
     _addMessage(ChatMessage(
-      text: "🌐 Testing Gemini AI connection...",
+      text: "🌐 Just making sure everything's working smoothly...",
       isUser: false,
       timestamp: DateTime.now(),
     ));
@@ -177,13 +177,13 @@ class _ChatScreenState extends State<ChatScreen>
     
     if (isConnected) {
       _addMessage(ChatMessage(
-        text: "✅ Gemini AI connected successfully! Ask me anything! 😊",
+        text: "✅ Awesome! I'm ready to help. What would you like to know about campus life at ERICA? 🎓",
         isUser: false,
         timestamp: DateTime.now(),
       ));
     } else {
       _addMessage(ChatMessage(
-        text: "❌ Gemini AI connection failed. Please check your internet connection.",
+        text: "❌ Hmm, seems like there's a connection issue. Could you check your internet and try again?",
         isUser: false,
         timestamp: DateTime.now(),
       ));
@@ -257,11 +257,11 @@ class _ChatScreenState extends State<ChatScreen>
         timestamp: DateTime.now(),
       ));
     } catch (e) {
-      _addMessage(ChatMessage(
-        text: "Sorry, an error occurred while generating a response. Please try again.",
-        isUser: false,
-        timestamp: DateTime.now(),
-      ));
+              _addMessage(ChatMessage(
+          text: "Sorry! Something went wrong on my end. 😅 Could you try asking that again? If this keeps happening, just let me know!",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
     }
   }
 
@@ -269,8 +269,13 @@ class _ChatScreenState extends State<ChatScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Gemini AI Chatbot'),
+        title: const Text('ERICA Campus Buddy'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.tune),
+            onPressed: () => _showStyleSelector(),
+            tooltip: 'Response Style',
+          ),
           IconButton(
             icon: const Icon(Icons.info_outline),
             onPressed: () => _showAppInfo(),
@@ -318,7 +323,7 @@ class _ChatScreenState extends State<ChatScreen>
           Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 16),
           SizedBox(width: 8),
           Text(
-            'PDF documents loaded - Answers will reference document content',
+            '📄 Official documents loaded - I can reference them for accurate answers',
             style: TextStyle(
               color: Color(0xFF22C55E),
               fontWeight: FontWeight.w600,
@@ -492,7 +497,7 @@ class _ChatScreenState extends State<ChatScreen>
             child: TextField(
               controller: _messageController,
               decoration: const InputDecoration(
-                hintText: 'Type your message...',
+                hintText: 'Ask me anything about campus life...',
                 hintStyle: TextStyle(
                   color: Color(0xFF9CA3AF),
                   fontSize: 16,
@@ -540,19 +545,101 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
+  // 답변 스타일 선택 다이얼로그
+  void _showStyleSelector() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Choose Response Style'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: ResponseStyle.values.map((style) {
+                return ListTile(
+                  leading: Radio<ResponseStyle>(
+                    value: style,
+                    groupValue: _geminiService.getCurrentStyle(),
+                    onChanged: (ResponseStyle? value) {
+                      if (value != null) {
+                        setState(() {
+                          _geminiService.setResponseStyle(value);
+                        });
+                        Navigator.pop(context);
+                        _addMessage(ChatMessage(
+                          text: "✅ Great! I've switched to '${_getStyleName(value)}' style. How's that for you?",
+                          isUser: false,
+                          timestamp: DateTime.now(),
+                        ));
+                      }
+                    },
+                  ),
+                  title: Text(_getStyleName(style)),
+                  subtitle: Text(_getStyleDescription(style)),
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // 스타일 이름 반환
+  String _getStyleName(ResponseStyle style) {
+    switch (style) {
+      case ResponseStyle.concise:
+        return 'Quick & Helpful';
+      case ResponseStyle.detailed:
+        return 'Detailed Explanation';
+      case ResponseStyle.bullet:
+        return 'Easy-to-Scan';
+      case ResponseStyle.stepByStep:
+        return 'Step-by-Step Guide';
+      case ResponseStyle.casual:
+        return 'Friendly Chat';
+      case ResponseStyle.formal:
+        return 'Clear & Professional';
+    }
+  }
+
+  // 스타일 설명 반환
+  String _getStyleDescription(ResponseStyle style) {
+    switch (style) {
+      case ResponseStyle.concise:
+        return 'Short, straight-to-the-point answers (50-100 words)';
+      case ResponseStyle.detailed:
+        return 'Comprehensive explanations with context (200-400 words)';
+      case ResponseStyle.bullet:
+        return 'Organized bullet points for easy reading';
+      case ResponseStyle.stepByStep:
+        return 'Clear numbered steps with helpful guidance';
+      case ResponseStyle.casual:
+        return 'Warm, friendly conversation style';
+      case ResponseStyle.formal:
+        return 'Professional but approachable tone';
+    }
+  }
+
   void _showAppInfo() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Gemini AI Chatbot'),
+          title: const Text('ERICA Campus Buddy'),
           content: const Text(
-            'An intelligent chatbot powered by Google Gemini AI.\n\n• Natural conversation\n• Real-time AI responses\n• Automatic PDF document reference\n\nVersion: 1.0.0 + Gemini',
+            'Your friendly AI campus guide for international students at Hanyang University ERICA Campus.\n\n• Natural conversation interface\n• Real-time AI-powered responses\n• Automatic reference to official documents\n• Customizable response styles\n• Support for students new to Korea\n\n🌍 Designed for international students\n📚 Accurate info based on official documents\n🤝 Friendly support level 3/5',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
+              child: const Text('Got it'),
             ),
           ],
         );

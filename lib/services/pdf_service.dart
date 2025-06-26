@@ -111,11 +111,11 @@ class PDFService {
 
 
 
-  // 텍스트 정리 함수
+  // Text cleaning function
   String _cleanText(String text) {
-    // 불필요한 공백 및 특수문자 정리
-    text = text.replaceAll(RegExp(r'\s+'), ' '); // 연속된 공백을 하나로
-    text = text.replaceAll(RegExp(r'\n\s*\n'), '\n\n'); // 연속된 줄바꿈 정리
+    // Clean unnecessary spaces and special characters
+    text = text.replaceAll(RegExp(r'\s+'), ' '); // Multiple spaces to single
+    text = text.replaceAll(RegExp(r'\n\s*\n'), '\n\n'); // Clean consecutive line breaks
     text = text.trim();
     
     return text;
