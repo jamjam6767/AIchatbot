@@ -103,6 +103,10 @@ class _ChatScreenState extends State<ChatScreen>
   // PDF 컨텍스트 저장
   String _pdfContext = '';
   bool _isPDFLoaded = false;
+  
+  // 언어 설정
+  String? _selectedLanguage;
+  bool _isLanguageSet = false;
 
   @override
   void initState() {
@@ -131,59 +135,34 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Future<void> _initializeApp() async {
-    // Initial welcome message
-    _addMessage(ChatMessage(
-      text: "Hey there! 👋 Welcome to Hanyang ERICA! I'm your friendly campus buddy here to help you navigate student life. Just setting things up... 🔄",
-      isUser: false,
-      timestamp: DateTime.now(),
-    ));
-    
-    // PDF loading
-    _addMessage(ChatMessage(
-      text: "📄 Loading official university documents so I can give you the most accurate information...",
-      isUser: false,
-      timestamp: DateTime.now(),
-    ));
-    
     try {
+      // 백그라운드에서 PDF 로드
       _pdfContext = await _pdfService.loadAssetPDFs();
       _isPDFLoaded = true;
       
       print('DEBUG: PDF 컨텍스트 로드 완료, 길이: ${_pdfContext.length}자');
-      print('DEBUG: PDF 컨텍스트 미리보기: ${_pdfContext.substring(0, _pdfContext.length > 200 ? 200 : _pdfContext.length)}...');
       
-      _addMessage(ChatMessage(
-        text: "✅ Perfect! I'm all ready to help you with campus life. Feel free to ask me anything about student life, courses, schedules, or anything else about ERICA! 😊",
-        isUser: false,
-        timestamp: DateTime.now(),
-      ));
+      // API 연결 테스트
+      final isConnected = await _geminiService.testConnection();
+      
+      // 언어 선택 요청 메시지
+      if (isConnected) {
+        _addMessage(ChatMessage(
+          text: "Hello! 👋 안녕하세요! こんにちは! 你好! Привет! Bonjour!\n\nI'm your AI assistant for Hanyang University ERICA Campus.\n\nWhich language would you prefer for our conversation?\n\n1. 🇺🇸 English\n2. 🇰🇷 한국어 (Korean)\n3. 🇯🇵 日本語 (Japanese)\n4. 🇨🇳 中文 (Chinese)\n5. 🇷🇺 Русский (Russian)\n6. 🇫🇷 Français (French)\n\nJust type the number (1-6) or language name! 😊",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+      } else {
+        _addMessage(ChatMessage(
+          text: "Hello! 👋 I'm your AI assistant for Hanyang University ERICA Campus.\n\nI'm having trouble connecting to the network right now. Please check your internet connection and try again.",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+      }
     } catch (e) {
-      print('DEBUG: PDF loading failed: $e');
+      print('DEBUG: 초기화 실패: $e');
       _addMessage(ChatMessage(
-        text: "⚠️ Having some trouble loading documents right now, but I can still help with general campus questions!",
-        isUser: false,
-        timestamp: DateTime.now(),
-      ));
-    }
-    
-    // API connection test
-    _addMessage(ChatMessage(
-      text: "🌐 Just making sure everything's working smoothly...",
-      isUser: false,
-      timestamp: DateTime.now(),
-    ));
-    
-    final isConnected = await _geminiService.testConnection();
-    
-    if (isConnected) {
-      _addMessage(ChatMessage(
-        text: "✅ Awesome! I'm ready to help. What would you like to know about campus life at ERICA? 🎓",
-        isUser: false,
-        timestamp: DateTime.now(),
-      ));
-    } else {
-      _addMessage(ChatMessage(
-        text: "❌ Hmm, seems like there's a connection issue. Could you check your internet and try again?",
+        text: "Hello! 👋 I'm your AI assistant for Hanyang University ERICA Campus.\n\nI'm having some trouble initializing all features right now, but I can still help you with basic questions.\n\nWhat can I help you with today?",
         isUser: false,
         timestamp: DateTime.now(),
       ));
@@ -209,6 +188,151 @@ class _ChatScreenState extends State<ChatScreen>
     });
   }
 
+  // 언어 변경 요청 감지 및 처리
+  String? _detectLanguageChangeRequest(String userInput) {
+    final input = userInput.toLowerCase().trim();
+    
+    // 특정 언어로 변경 요청
+    if (input.contains('영어로') || input.contains('english로') || 
+        input.contains('change to english') || input.contains('switch to english')) {
+      return 'English';
+    }
+    if (input.contains('한국어로') || input.contains('korean로') || 
+        input.contains('change to korean') || input.contains('switch to korean')) {
+      return 'Korean';
+    }
+    if (input.contains('일본어로') || input.contains('japanese로') || 
+        input.contains('change to japanese') || input.contains('switch to japanese') ||
+        input.contains('日本語に')) {
+      return 'Japanese';
+    }
+    if (input.contains('중국어로') || input.contains('chinese로') || 
+        input.contains('change to chinese') || input.contains('switch to chinese') ||
+        input.contains('中文')) {
+      return 'Chinese';
+    }
+    if (input.contains('러시아어로') || input.contains('russian로') || 
+        input.contains('change to russian') || input.contains('switch to russian') ||
+        input.contains('на русский')) {
+      return 'Russian';
+    }
+    if (input.contains('프랑스어로') || input.contains('french로') || 
+        input.contains('change to french') || input.contains('switch to french') ||
+        input.contains('en français')) {
+      return 'French';
+    }
+    
+    // 일반적인 언어 변경 요청 (언어 선택 메뉴로 이동)
+    List<String> generalChangeKeywords = [
+      // English
+      'change language', 'switch language', 'language change', 'different language',
+      'choose language', 'select language', 'language setting', 'language option',
+      
+      // Korean
+      '언어 변경', '언어 바꾸기', '언어 선택', '언어 설정', '다른 언어',
+      
+      // Japanese  
+      '言語変更', '言語を変える', '言語選択', '言語設定', '他の言語',
+      
+      // Chinese
+      '语言更改', '更改语言', '语言选择', '语言设置', '其他语言', '换语言',
+      
+      // Russian
+      'изменить язык', 'сменить язык', 'выбрать язык', 'другой язык',
+      
+      // French
+      'changer langue', 'modifier langue', 'choisir langue', 'autre langue'
+    ];
+    
+    if (generalChangeKeywords.any((keyword) => input.contains(keyword))) {
+      return 'MENU'; // 언어 선택 메뉴 표시
+    }
+    
+    return null; // 언어 변경 요청 없음
+  }
+
+  // 언어 변경 확인 메시지 생성
+  String _getLanguageChangeMessage(String newLanguage) {
+    switch (newLanguage) {
+      case 'English':
+        return "언어 설정이 English로 변경되었어. 무엇을 도와줄까?";
+      case 'Korean':
+        return "언어 설정이 한국어로 변경되었어. 무엇을 도와줄까?";
+      case 'Japanese':
+        return "言語設定が日本語に変更されました。何をお手伝いしましょうか？";
+      case 'Chinese':
+        return "语言设置已更改为中文。需要我帮什么忙吗？";
+      case 'Russian':
+        return "Настройка языка изменена на русский. Чем могу помочь?";
+      case 'French':
+        return "Configuration linguistique changée en français. Que puis-je faire pour vous?";
+      default:
+        return "Language changed. How can I help you?";
+    }
+  }
+
+  // 언어 감지 및 설정
+  bool _detectAndSetLanguage(String userInput) {
+    final input = userInput.toLowerCase().trim();
+    
+    print('DEBUG: 사용자 입력: "$input"');
+    
+    if (input == '1' || input.contains('english') || input.contains('eng')) {
+      _selectedLanguage = 'English';
+      _geminiService.setLanguage('English');
+      print('DEBUG: English 언어 설정 완료');
+      return true;
+    } else if (input == '2' || input.contains('한국어') || input.contains('korean') || input.contains('kor')) {
+      _selectedLanguage = 'Korean';
+      _geminiService.setLanguage('Korean');
+      print('DEBUG: Korean 언어 설정 완료');
+      return true;
+    } else if (input == '3' || input.contains('日本語') || input.contains('japanese') || input.contains('jpn')) {
+      _selectedLanguage = 'Japanese';
+      _geminiService.setLanguage('Japanese');
+      print('DEBUG: Japanese 언어 설정 완료');
+      return true;
+    } else if (input == '4' || input.contains('中文') || input.contains('chinese') || input.contains('chn')) {
+      _selectedLanguage = 'Chinese';
+      _geminiService.setLanguage('Chinese');
+      print('DEBUG: Chinese 언어 설정 완료');
+      return true;
+    } else if (input == '5' || input.contains('русский') || input.contains('russian') || input.contains('rus')) {
+      _selectedLanguage = 'Russian';
+      _geminiService.setLanguage('Russian');
+      print('DEBUG: Russian 언어 설정 완료');
+      return true;
+    } else if (input == '6' || input.contains('français') || input.contains('french') || input.contains('fra') || input.contains('francais')) {
+      _selectedLanguage = 'French';
+      _geminiService.setLanguage('French');
+      print('DEBUG: French 언어 설정 완료');
+      return true;
+    }
+    
+    print('DEBUG: 언어를 인식하지 못함');
+    return false;
+  }
+
+  // 언어별 환영 메시지
+  String _getWelcomeMessage(String language) {
+    switch (language) {
+      case 'English':
+        return "English 설정이 완료되었어. 무엇을 도와줄까?";
+      case 'Korean':
+        return "한국어 설정이 완료되었어. 무엇을 도와줄까?";
+      case 'Japanese':
+        return "言語設定が完了しました。何をお手伝いしましょうか？";
+      case 'Chinese':
+        return "中文设置完成了。需要我帮什么忙吗？";
+      case 'Russian':
+        return "Настройка русского языка завершена. Чем могу помочь?";
+      case 'French':
+        return "Configuration du français terminée. Que puis-je faire pour vous?";
+      default:
+        return "Language set! How can I help you today?";
+    }
+  }
+
   Future<void> _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
@@ -225,18 +349,59 @@ class _ChatScreenState extends State<ChatScreen>
     final userText = _messageController.text.trim();
     _messageController.clear();
 
+    // 언어가 설정되지 않은 경우 언어 설정 처리
+    if (!_isLanguageSet) {
+      if (_detectAndSetLanguage(userText)) {
+        _isLanguageSet = true;
+        
+        _addMessage(ChatMessage(
+          text: _getWelcomeMessage(_selectedLanguage!),
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+        return;
+      } else {
+        // 언어를 인식하지 못한 경우
+        _addMessage(ChatMessage(
+          text: "I didn't understand that language choice. Please type:\n\n1 for English 🇺🇸\n2 for 한국어 🇰🇷\n3 for 日본語 🇯🇵\n4 for 중文 🇨🇳\n5 for Русский 🇷🇺\n6 for Français 🇫🇷\n\nOr type the language name directly! 😊",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+        return;
+      }
+    }
+
+    // 언어 변경 요청 처리
+    String? languageChangeRequest = _detectLanguageChangeRequest(userText);
+    if (languageChangeRequest != null) {
+      if (languageChangeRequest == 'MENU') {
+        // 일반적인 언어 변경 요청 - 메뉴 표시
+        _isLanguageSet = false;
+        _selectedLanguage = null;
+        
+        _addMessage(ChatMessage(
+          text: "Hello! 👋 안녕하세요! こんにちは! 你好! Привет! Bonjour!\n\nWhich language would you prefer for our conversation?\n\n1. 🇺🇸 English\n2. 🇰🇷 한국어 (Korean)\n3. 🇯🇵 日本語 (Japanese)\n4. 🇨🇳 中문 (Chinese)\n5. 🇷🇺 Русский (Russian)\n6. 🇫🇷 Français (French)\n\nJust type the number (1-6) or language name! 😊",
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+        return;
+      } else {
+        // 특정 언어로 직접 변경 요청
+        _selectedLanguage = languageChangeRequest;
+        _geminiService.setLanguage(languageChangeRequest);
+        
+        _addMessage(ChatMessage(
+          text: _getLanguageChangeMessage(languageChangeRequest),
+          isUser: false,
+          timestamp: DateTime.now(),
+        ));
+        return;
+      }
+    }
+
     // 타이핑 상태 시작
     setState(() {
       _isTyping = true;
-    });
-
-    // 2초 딜레이 후 응답
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (!mounted) return;
-
-    setState(() {
-      _isTyping = false;
     });
 
     // Generate Gemini AI response (always include PDF context)
@@ -251,17 +416,53 @@ class _ChatScreenState extends State<ChatScreen>
         botResponse = await _geminiService.generateResponse(userText);
       }
       
+      // 타이핑 상태 종료
+      if (mounted) {
+        setState(() {
+          _isTyping = false;
+        });
+      }
+      
       _addMessage(ChatMessage(
         text: botResponse,
         isUser: false,
         timestamp: DateTime.now(),
       ));
     } catch (e) {
-              _addMessage(ChatMessage(
-          text: "Sorry! Something went wrong on my end. 😅 Could you try asking that again? If this keeps happening, just let me know!",
-          isUser: false,
-          timestamp: DateTime.now(),
-        ));
+      // 타이핑 상태 종료 (에러 시에도)
+      if (mounted) {
+        setState(() {
+          _isTyping = false;
+        });
+      }
+      
+      // 설정된 언어에 따른 에러 메시지
+      String errorMessage;
+      switch (_selectedLanguage) {
+        case 'Korean':
+          errorMessage = "죄송합니다! 문제가 발생했습니다. 😅 다시 질문해 주시겠어요? 계속 문제가 발생하면 알려주세요!";
+          break;
+        case 'Japanese':
+          errorMessage = "申し訳ございません！問題が発生しました。😅 もう一度質問していただけますか？問題が続く場合はお知らせください！";
+          break;
+        case 'Chinese':
+          errorMessage = "抱歉！出现了问题。😅 您能再问一次吗？如果问题持续出现，请告诉我！";
+          break;
+        case 'Russian':
+          errorMessage = "Извините! Что-то пошло не так. 😅 Не могли бы вы спросить еще раз? Если проблема продолжается, дайте мне знать!";
+          break;
+        case 'French':
+          errorMessage = "Désolé! Quelque chose s'est mal passé. 😅 Pourriez-vous reposer votre question? Si le problème persiste, faites-le moi savoir!";
+          break;
+        default:
+          errorMessage = "Sorry! Something went wrong on my end. 😅 Could you try asking that again? If this keeps happening, just let me know!";
+      }
+      
+      _addMessage(ChatMessage(
+        text: errorMessage,
+        isUser: false,
+        timestamp: DateTime.now(),
+      ));
     }
   }
 
@@ -566,8 +767,30 @@ class _ChatScreenState extends State<ChatScreen>
                           _geminiService.setResponseStyle(value);
                         });
                         Navigator.pop(context);
+                        // 언어별 스타일 변경 확인 메시지
+                        String confirmMessage;
+                        switch (_selectedLanguage) {
+                          case 'Korean':
+                            confirmMessage = "스타일이 변경되었어. 무엇을 도와줄까?";
+                            break;
+                          case 'Japanese':
+                            confirmMessage = "スタイルが変更されました。何をお手伝いしましょうか？";
+                            break;
+                          case 'Chinese':
+                            confirmMessage = "风格已更改。需要我帮什么忙吗？";
+                            break;
+                          case 'Russian':
+                            confirmMessage = "Стиль изменен. Чем могу помочь?";
+                            break;
+                          case 'French':
+                            confirmMessage = "Style modifié. Que puis-je faire pour vous?";
+                            break;
+                          default:
+                            confirmMessage = "Style changed. How can I help?";
+                        }
+                        
                         _addMessage(ChatMessage(
-                          text: "✅ Great! I've switched to '${_getStyleName(value)}' style. How's that for you?",
+                          text: confirmMessage,
                           isUser: false,
                           timestamp: DateTime.now(),
                         ));
@@ -659,3 +882,5 @@ class ChatMessage {
     required this.timestamp,
   });
 }
+
+
